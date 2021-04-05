@@ -1,0 +1,394 @@
+# '''
+# Del'Juan Jackson
+# Database Systems
+# 010598564
+# '''
+
+import mysql.connector
+import os, time, sys
+from tabulate import tabulate
+import random
+           
+def open_database (hostname,user_name,mysql_pw,database_name):
+      global conn
+      conn= mysql.connector.connect(host= hostname, 
+      user= user_name,  
+      password= mysql_pw, 
+      database= database_name 
+    ) 
+      global cursor
+      cursor = conn.cursor() 
+
+def printFormat(result):
+    header=[]
+    for cd in cursor.description:# get headers
+        header.append(cd[0])
+    print('')
+    print('Query Result:')
+    print('')
+    print(tabulate(result, headers=header))# print results in table format
+
+# select and display query
+def executeSelect (query):
+    cursor.execute(query)
+    printFormat(cursor.fetchall())
+
+def  insert(table,values):
+     query ="INSERT into " + table + " values (" + values + ")" +';'
+     cursor.execute(query)
+     conn.commit()
+
+
+def executeUpdate(query): # use this function for delete and update
+    cursor.execute(query)
+    conn.commit()
+
+def read_query(query):
+    result = None
+    cursor.execute(query)
+    result = cursor.fetchall()
+    return result
+
+
+def close_db():  # use this function to close db
+    cursor.close()
+    conn.close()
+   # os.system("clear")
+
+
+'''
+MENU PROMPT FUNCTION
+TO BE USED BY USER TO NAVIGATE THE PROGRAM
+'''
+def prompt():
+    print('''
+    %s[+]----DATABASE----[+]
+      [01] SUPPLIER BY COUNTRY
+      [02] ADD SUPPLIER
+      [03] EMPLOYEE PERFORMANCE
+      [04] UPDATE ITEM
+      [05] CANCEL SALES
+      [06] EXIT DATABASE
+    		''')
+
+#MAIN FUNCTION, CONTROLLED BY MENU OPTIONS
+def go():
+    prompt()
+    while True:
+        menu = input(' Menu OPTION >>')
+
+#'''QUESTION 1:'''
+# 1) Find all suppliers and coffees name in a given country [ Menu option 1. Supplier by Country] Prompt the user for a country. Find and list all available suppliers and coffee from that location. Display all information of those suppliers and coffees.
+# Expected output:
+# Supplier ID, Supplier Name, Supplier Phone, Coffee name, Roasting Type
+        if menu == '01' or menu == '1':
+           # os.system("clear")
+            country = input(' ENTER COUNTRY >>')
+            country = country.upper()
+
+            #RERIEVES ADDRESS FROM TABLE
+            q1 = """ 
+            SELECT 1 FROM SUPPLIER s  
+            WHERE s.ADDRESS = '{0}';
+                   """
+            result = read_query(q1.format(country))
+
+            #IF EMPTY, COUNTRY DOES NOT EXIST IN TABLE
+            if(result == []):
+                print("COUNTRY NOT FOUND")
+            else:
+                #OUTPUT OF SELECTION QUERY
+                s1 = """
+                SELECT m.SUPPLIER_ID, s.NAME, s.PHONE_NUMBER, i.NAME, i.ROASTING
+                FROM INVENTORY_MGMT m, ITEM i, SUPPLIER s
+                WHERE s.ADDRESS = '{0}' AND s.ID = m.SUPPLIER_ID AND m.ITEM_ID = i.ID
+                ORDER BY m.SUPPLIER_ID, s.NAME, s.PHONE_NUMBER, i.NAME, i.ROASTING;
+                """
+                executeSelect(s1.format(country)) 
+                prompt()
+
+#'''QUESTION 2:'''
+# 2) Add a new supplier, the show who else provides this item. 
+# [ Menu option 2. Add Supplier] Prompt the user to enter a new supplier with name, phone number and country.
+# Add the supplier info to SUPPLIER Table and INVENTORY_MGMT. 
+# Please make sure that the new supplier sells one or more of the coffee names in ITEM. 
+# Then, prompt the supplier for the name of the coffee that they can provide.
+# Expected Output:
+# The full record for the new supplier.
+# The names of the other suppliers who supply the same coffee.
+        elif menu == '02' or menu == '2':
+           # os.system("clear")
+            supplier_name = input(' ENTER SUPPLIER NAME >>')
+            supplier_name = supplier_name.upper()
+
+            #INPUT HANDLER
+            while True:
+                try:
+                    phone_number = int(input(' ENTER PHONE NUMBER >>'))
+                    break
+                except ValueError:
+                    print("INVALID ENTRT, ENTER DIGITS ONLY\n")
+
+            country = input(' ENTER COUNTRY >>')
+            country = country.upper()
+            coffee = input(' ENTER NAME OF COFFEE >>')
+            coffee = coffee.upper()
+
+            #INPUT HANDLER
+            while True:
+                try:
+                    price_per_lb = int(input(' ENTER PRICE OF COFFEE PER LB.>>'))
+                    break
+                except ValueError:
+                    print("INVALID ENTRY, ENTER FLOAT DIGITS ONLY\n")
+            price_per_lb = float(price_per_lb)
+
+            #INPUT HANDLER
+            while True:
+                roasting = input(' ENTER ROAST LEVEL >>')
+                roasting = roasting.upper()
+                if roasting == 'M' or roasting == 'D':
+                    break
+                elif roasting == 'L':
+                    break
+                else:
+                    print("INVALID ENTRY, ENTER L, M OR D\n")
+
+            #INPUT HANDLER
+            while True:
+                try:
+                    sales = int(input(' ENTER NUMBER OF SALES MADE >>'))
+                    break
+                except ValueError:
+                    print("INVALID ENTRY, ENTER DIGITS ONLY\n")
+
+            #INPUT HANDLER
+            while True:
+                try:
+                    stock = int(input(' ENTER NUMBER OF STOCK ON-HAND >>'))
+                    break
+                except ValueError:
+                    print("INVALID ENTRY, ENTER DIGITS ONLY\n")
+
+       
+            #RETRIEVES ID FOR NEXT INSERT
+            q2 = """ 
+            SELECT MAX(s.ID) 
+            FROM SUPPLIER s;
+            """
+            res = read_query(q2)
+            result = res[0]
+            result = result[0] + 1
+            supplier_id = result   
+
+            #SUPPLIER INSERT
+            S2 = """
+                {0}, '{1}', {2}, '{3}'
+            """
+            insert('SUPPLIER', S2.format(supplier_id,supplier_name,phone_number,country))
+
+            #FIND NEXT ITEM ID 
+            itemQuery = """ 
+            SELECT MAX(i.ID) 
+            FROM ITEM i;
+            """
+            res = read_query(itemQuery)
+            result = res[0]
+            result = result[0] + 1
+            itemID = result
+
+            #INSERT INFORMATION INTO THE ITEM TABLE
+            itemInsert1 = """
+                {0}, '{1}', {2}, '{3}'
+            """
+            insert('ITEM', itemInsert1.format(itemID,coffee,price_per_lb,roasting))
+
+
+            #INSERT INFORMATION INTO THE INVENTORY_MGMT TABLE
+            inventoryMmgt = """
+                {0}, '{1}', {2}, '{3}'
+            """
+            insert('INVENTORY_MGMT', inventoryMmgt.format(itemID,supplier_id,sales,stock))
+
+            itemInsert2 = """
+                {0}, '{1}', {2}, '{3}'
+            """
+            randomitemID = random.randint(1,14)
+            
+            insert('INVENTORY_MGMT', itemInsert2.format(randomitemID,supplier_id,0,0))
+
+            #OUTPUT RECORD OF INSERTED SUPPLIER
+            record = """
+            SELECT s.ID, s.NAME, s.PHONE_NUMBER, s.ADDRESS
+            FROM SUPPLIER s
+            WHERE s.ID = {0};
+            """
+            executeSelect(record.format(supplier_id))
+
+            #ALL SUPPLIERS WHOME SELL SAME PRODUCTS
+            record = """
+            SELECT DISTINCT s.Name, i.Name, s.ID
+            FROM SUPPLIER s, ITEM i, INVENTORY_MGMT m
+            WHERE i.ID = {0} OR i.ID = {1}
+            ORDER BY s.Name, i.Name, s.ID;
+            """
+            executeSelect(record.format(itemID, randomitemID))
+            prompt()
+
+#'''QUESTION 3:'''
+# 3) List all items sold by a specific employee [ Menu option 3. Employee Performance] 
+# Prompt the user to enter an employee name.
+        elif menu == '03' or menu == '3':
+           # os.system("clear")
+            employee_name = input('ENTER EMPLOYEE NAME>>')
+            employee_name = employee_name.upper()
+
+            #RETRIEVES EMPLOYEE ID
+            q7 = """
+                SELECT e.ID
+                FROM EMPLOYEE e
+                WHERE e.NAME = '{0}'
+                """
+            value = read_query(q7.format(employee_name))
+            
+            #IF NOT FOUND
+            if(value == []):
+                print("NAME NOT FOUND")
+            else:
+                result = value[0]
+                value = result[0] 
+
+                #LIST OF ALL SALES OF SPECIFIC EMPLOYEE
+                q8 = """
+                SELECT DISTINCT e.NAME, i.NAME,  i.ROASTING, i.PRICE_PER_LB
+                FROM ITEM i, EMPLOYEE e, SALES s
+                WHERE e.NAME = '{0}' AND s.EMPLOYEE_ID = {1} AND s.ITEM_ID = i.ID;
+                """
+                executeSelect(q8.format(employee_name, value))
+
+                prompt()
+
+#'''QUESTION 4:'''
+# 4) Update ITEM: This handles what happens when the company gets a new shipment or makes a sale. 
+# Prompt the user to enter the name of an item, 
+# update the availability of that item in INVENTORY_MGMT table.
+# Expected Output:
+# The name of the item and the quantity before and after the update.
+        elif menu == '04' or menu == '4':
+           # os.system("clear")
+            item = input(' ENTER NAME OF ITEM >>')
+            item = item.upper()
+
+            #RETRIEVE ID TO UPDATE TABLE
+            q3 = """
+            SELECT i.ID
+            FROM ITEM i
+            WHERE i.NAME = '{0}';
+            """
+            value = read_query(q3.format(item))
+
+            #IF NOT FOUND
+            if(value == []):
+                print("ITEM NOT FOUND")
+            else:
+                result = value[0]
+                value = result[0] 
+
+                #VALUES BEFORE UPDATE
+                q3 = """
+                SELECT i.NAME, m.ITEM_ID, m.SUPPLIER_ID, m.TOTAL_AVAILABLE
+                FROM INVENTORY_MGMT m, ITEM i
+                WHERE m.ITEM_ID = '{0}' AND m.ITEM_ID = i.ID;
+                """
+                executeSelect(q3.format(value))
+
+            #ERROR HANDLER
+                while True:
+                    try:
+                        stock = int(input(' ENTER NEW INVENTORY COUNT >> '))
+                        break
+                    except ValueError:
+                        print("INVALID ENTRY, ENTER DIGITS ONLY\n")
+                
+                    #UPDATE INVENTORY WITH NEW VALUES
+                q4 = """
+                UPDATE INVENTORY_MGMT
+                SET TOTAL_AVAILABLE = {1}            
+                WHERE ITEM_ID = {0};
+                """
+                executeUpdate(q4.format(value, stock))
+
+                #VALUES AFTER UPDATE
+                q5 = """
+                SELECT i.NAME, m.ITEM_ID, m.SUPPLIER_ID, m.TOTAL_AVAILABLE
+                FROM INVENTORY_MGMT m, ITEM i
+                WHERE m.ITEM_ID = '{0}' AND m.ITEM_ID = i.ID;
+                """
+                executeSelect(q5.format(value))
+
+                prompt()
+
+#'''QUESTION 5:'''
+# 5) Cancel Sales: ** 10 point Bonus Question**
+# Prompt the user to enter a Transaction ID to cancel sales. 
+# It is important to note that you should not delete any transactions, 
+# but they should be indicated as cancelled and the items in that sale 
+# returned to the inventory. Consider all tables that are affected by 
+# this transaction. You may need to update the database scheme.
+# Expected Output:
+# Your testing should show the affected tables before and after a cancelled sale.
+
+# '''
+# An attmept was made at this function however there is not enough
+# information available to complete the function that's asked. There
+# is no way to know how many of one item were sold.
+# '''
+        elif menu == '05' or menu == '5':
+           # os.system("clear")
+            trans_id = input('ENTER TRANSACTION NUMBER >>')
+            trans_id = trans_id.upper()
+
+            q1 = """
+            SELECT s.ITEM_ID
+            FROM SALES s
+            WHERE s.TRANS_ID = {0};
+            """
+            value = read_query(q1.format(trans_id))
+
+            q2 = """
+            SELECT SUM(s.ITEM_ID
+            FROM SALES s
+            WHERE s.TRANS_ID = {0};
+            """
+            value = read_query(q1.format(trans_id))
+            
+            q4 = """
+            UPDATE INVENTORY_MGMT
+            SET TOTAL_AVAILABLE = {1}            
+            WHERE ITEM_ID = {0};
+            """
+            executeUpdate(q4.format(value, stock))
+
+            prompt()
+#EXITING DATABASE
+        elif menu == '06' or menu == '6':
+            print('EXITING DATABASE')
+            break
+        else:
+            print(' INPUT ERROR %s' % (menu))
+            prompt()
+
+mysql_username = 'dtjackso' # please change to your username
+mysql_password ='Voozae7e'  # please change to your MySQL password
+
+open_database('localhost',mysql_username,mysql_password,mysql_username) # open database   
+
+#DRIVER FUNCTION
+go()
+
+close_db() # close database
+
+
+
+
+
